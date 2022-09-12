@@ -22,7 +22,7 @@ namespace RomDatManager
         public List<Game> romsToVerify = new List<Game>();
 
         public string datCheck = "datCheck.dat";
-        public string folderRoms = @"files\";
+        public string folderRoms = @"J64\";
 
         public frmMain()
         {
@@ -75,8 +75,6 @@ namespace RomDatManager
                 {
                     XmlSerializer xs = new XmlSerializer(typeof(DataFile));
                     DataFile dat = (DataFile)xs.Deserialize(reader);
-                    //dat.Games[0].Name = "Miau";
-                    //CreateDat(dat, "newDat.dat");
                     return dat;
                 }
             }
@@ -86,10 +84,18 @@ namespace RomDatManager
         public List<Game> LoadFiles(string folder)
         {
             List<Game> games = new List<Game>();
+
             DirectoryInfo d = new DirectoryInfo(folder);
-            foreach (var file in d.GetFiles())
+            if (d.Exists)
             {
-                games.Add(CreateGame(file));
+                foreach (var file in d.GetFiles())
+                {
+                    Game g = CreateGame(file);
+                    if (g.Roms.Count > 0)
+                    {
+                        games.Add(g);
+                    }
+                }
             }
             return games.OrderBy(g => g.Name).ToList();
         }
@@ -179,31 +185,41 @@ namespace RomDatManager
 
             if (Path.GetExtension(file.FullName).Equals(".zip") == false) { return roms; }
 
-            using (ZipArchive zip = ZipFile.Open(file.FullName, ZipArchiveMode.Read))
+            using (ZipArchive zip = ZipFile.OpenRead(file.FullName))
             {
+                Stream _backingStream;
+
                 foreach (ZipArchiveEntry entry in zip.Entries)
                 {
                     long size = entry.Length;
 
                     Stream fs = entry.Open();
+
+                    //Performance Trick
+                    //https://social.msdn.microsoft.com/Forums/en-US/9e80eef1-7755-4303-a686-7315d2a42a9a/performance-issues-with-ziparchive?forum=winappswithcsharp
+                    if (!fs.CanSeek)
+                    {
+                        _backingStream = fs;
+                        fs = new MemoryStream();
+                        _backingStream.CopyTo(fs);
+                        fs.Seek(0L, SeekOrigin.Begin);
+                    }
+
                     byte[] bCRC = CRC32.Create().ComputeHash(fs);
                     string crc = BitConverter.ToString(bCRC).Replace("-", "").ToLower();
-                    //fs.Position = 0;
+                    fs.Position = 0;
 
-                    //fs = entry.Open();
-                    //byte[] bMD5 = MD5.Create().ComputeHash(fs);
-                    //string md5 = BitConverter.ToString(bMD5).Replace("-", "").ToLower();
-                    ////fs.Position = 0;
+                    byte[] bMD5 = MD5.Create().ComputeHash(fs);
+                    string md5 = BitConverter.ToString(bMD5).Replace("-", "").ToLower();
+                    fs.Position = 0;
 
-                    //fs = entry.Open();
-                    //byte[] bSHA1 = SHA1Cng.Create().ComputeHash(fs);
-                    //string sha1 = BitConverter.ToString(bSHA1).Replace("-", "").ToLower();
-                    ////fs.Position = 0;
+                    byte[] bSHA1 = SHA1Cng.Create().ComputeHash(fs);
+                    string sha1 = BitConverter.ToString(bSHA1).Replace("-", "").ToLower();
+                    fs.Position = 0;
 
-                    //fs = entry.Open();
-                    //byte[] bSHA256 = SHA256.Create().ComputeHash(fs);
-                    //string sha256 = BitConverter.ToString(bSHA256).Replace("-", "").ToLower();
-                    ////fs.Position = 0;
+                    byte[] bSHA256 = SHA256.Create().ComputeHash(fs);
+                    string sha256 = BitConverter.ToString(bSHA256).Replace("-", "").ToLower();
+                    fs.Position = 0;
 
                     roms.Add(
                         new Rom
@@ -211,9 +227,9 @@ namespace RomDatManager
                             Name = entry.Name,
                             Size = size,
                             CRC32 = crc,
-                            //MD5 = md5,
-                            //SHA1 = sha1,
-                            //SHA256 = sha256
+                            MD5 = md5,
+                            SHA1 = sha1,
+                            SHA256 = sha256
                         });
                 }
             }
@@ -225,6 +241,8 @@ namespace RomDatManager
         {
             List<Rom> roms = new List<Rom>();
 
+            if (Path.GetExtension(file.FullName).Equals(".zip") == true) { return roms; }
+
             using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read))
             {
                 long size = fs.Length;
@@ -233,20 +251,17 @@ namespace RomDatManager
                 string crc = BitConverter.ToString(bCRC).Replace("-", "").ToLower();
                 fs.Position = 0;
 
-                //fs = entry.Open();
-                //byte[] bMD5 = MD5.Create().ComputeHash(fs);
-                //string md5 = BitConverter.ToString(bMD5).Replace("-", "").ToLower();
-                ////fs.Position = 0;
+                byte[] bMD5 = MD5.Create().ComputeHash(fs);
+                string md5 = BitConverter.ToString(bMD5).Replace("-", "").ToLower();
+                fs.Position = 0;
 
-                //fs = entry.Open();
-                //byte[] bSHA1 = SHA1Cng.Create().ComputeHash(fs);
-                //string sha1 = BitConverter.ToString(bSHA1).Replace("-", "").ToLower();
-                ////fs.Position = 0;
+                byte[] bSHA1 = SHA1Cng.Create().ComputeHash(fs);
+                string sha1 = BitConverter.ToString(bSHA1).Replace("-", "").ToLower();
+                fs.Position = 0;
 
-                //fs = entry.Open();
-                //byte[] bSHA256 = SHA256.Create().ComputeHash(fs);
-                //string sha256 = BitConverter.ToString(bSHA256).Replace("-", "").ToLower();
-                ////fs.Position = 0;
+                byte[] bSHA256 = SHA256.Create().ComputeHash(fs);
+                string sha256 = BitConverter.ToString(bSHA256).Replace("-", "").ToLower();
+                fs.Position = 0;
 
                 roms.Add(
                     new Rom
@@ -254,9 +269,9 @@ namespace RomDatManager
                         Name = file.Name,
                         Size = size,
                         CRC32 = crc,
-                        //MD5 = md5,
-                        //SHA1 = sha1,
-                        //SHA256 = sha256
+                        MD5 = md5,
+                        SHA1 = sha1,
+                        SHA256 = sha256
                     });
             }
 
@@ -265,25 +280,27 @@ namespace RomDatManager
 
         private void LoadDatDBText()
         {
-            txtRomsDataFile.Text = "";
             lblDatRomsTxt.Text = "DataFile: " + txtDatFile.Text;
 
+            StringBuilder s = new StringBuilder();
             foreach (var datGame in datDB.Games)
             {
                 foreach (var rom in datGame.Roms)
                 {
                     string c = "X";
                     if (rom.Checked) { c = "V"; }
-                    txtRomsDataFile.Text += c + ": " + rom.Name + Environment.NewLine;
+                    s.Append(c + ": " + rom.Name + Environment.NewLine);
                 }
             }
+
+            txtRomsDataFile.Text = s.ToString();
         }
 
         private void LoadVerifiedRomsText()
         {
-            txtRomsVerified.Text = "";
             lblRomsFolderTxt.Text = "Roms in: " + txtFolderRoms.Text;
 
+            StringBuilder s = new StringBuilder();
             foreach (var gameV in romsToVerify)
             {
                 foreach (var vRom in gameV.Roms)
@@ -304,9 +321,10 @@ namespace RomDatManager
                     {
                         c = "V";
                     }
-                    txtRomsVerified.Text += c + ": " + vRom.Name + cName + Environment.NewLine;
+                    s.Append(c + ": " + vRom.Name + cName + Environment.NewLine);
                 }
             }
+            txtRomsVerified.Text = s.ToString();
         }
 
         private void btnRename_Click(object sender, EventArgs e)
@@ -364,14 +382,18 @@ namespace RomDatManager
 
         private void btnReloadFiles_Click(object sender, EventArgs e)
         {
+            TimeSpan ini0 = new TimeSpan(DateTime.Now.Ticks);
             ReloadDatAndFiles();
-            MessageBox.Show("Roms Loaded!");
+            TimeSpan fim0 = new TimeSpan(DateTime.Now.Ticks) - ini0;
+            MessageBox.Show("Roms Loaded in " + fim0.TotalSeconds.ToString("N3") + "s");
         }
 
         private void btnGenerateDat_Click(object sender, EventArgs e)
         {
+            TimeSpan ini0 = new TimeSpan(DateTime.Now.Ticks);
             GenerateDatFile(txtFolderRoms.Text, txtDatFile.Text);
-            MessageBox.Show("Dat File Generated!");
+            TimeSpan fim0 = new TimeSpan(DateTime.Now.Ticks) - ini0;
+            MessageBox.Show("Dat File Generated in " + fim0.TotalSeconds.ToString("N3") + "s");
         }
     }
 }
